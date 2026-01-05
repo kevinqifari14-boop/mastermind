@@ -2,44 +2,53 @@ import streamlit as st
 import google.generativeai as genai
 
 # --- CONFIG ---
-st.set_page_config(page_title="Mastermind: School Takeover", page_icon="🎓")
-st.title("🎓 The Mastermind")
-st.subheader("Misi: Kuasai Sekolah dengan Strategi")
+st.set_page_config(page_title="Mastermind School", page_icon="🏫")
+st.title("🎓 The Mastermind: School Takeover")
 
-# Mengambil API Key dari Secrets Streamlit (Wajib diisi di Dashboard Streamlit)
-try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=API_KEY)
-except Exception:
-    st.error("🚨 API Key tidak ditemukan di Secrets!")
-    st.stop()
+# 1. MASUKKAN API KEY KAMU
+API_KEY = "AIzaSyDAu43dIY8KANIsxoNs2HZxBJ8_-GAQrRI"
+genai.configure(api_key=API_KEY)
 
-# Inisialisasi Model
-model = genai.GenerativeModel('gemini-1.5-flash')
+# 2. INISIALISASI MODEL (OTOMATIS MENCARI YANG AKTIF)
+@st.cache_resource
+def load_model():
+    # Mencari model yang tersedia agar tidak 404
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            return genai.GenerativeModel(m.name)
+    return None
 
-# Memori Chat
+model = load_model()
+
+# 3. MEMORI CHAT
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    intro = "Tahun ajaran baru dimulai. OSIS dikuasai oleh elit yang arogan. Kamu berdiri di depan gerbang sekolah dengan rencana rahasia. Apa langkah pertamamu?"
+    intro = "Tahun ajaran baru dimulai. OSIS sekolah dikuasai oleh geng elit. Kamu duduk di pojok kelas, merencanakan sesuatu yang besar. Apa langkah pertamamu?"
     st.session_state.messages.append({"role": "assistant", "content": intro})
 
 # Tampilkan Chat
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    st.chat_message(msg["role"]).write(msg["content"])
 
-# Input Pemain
-if prompt := st.chat_input("Masukkan aksimu..."):
+# 4. INPUT PEMAIN
+if prompt := st.chat_input("Ketik strategimu..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    st.chat_message("user").write(prompt)
 
-    with st.chat_message("assistant"):
-        try:
-            # Gabungkan instruksi dengan input user
-            full_query = f"Instruksi: Kamu GM Game RPG Sekolah. Berikan narasi pendek, status, dan 3 opsi. Pesan pemain: {prompt}"
-            response = model.generate_content(full_query)
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-        except Exception as e:
-            st.error(f"Terjadi kesalahan: {e}")
+    try:
+        # Instruksi sistem agar AI tetap jadi Game Master
+        full_prompt = (
+            "Kamu adalah Game Master 'The Mastermind'. "
+            "Tema: Strategi mengambil alih sekolah. "
+            "Berikan narasi pendek, status Reputasi & Pengaruh, dan 3 opsi aksi. "
+            f"Pesan pemain: {prompt}"
+        )
+        
+        response = model.generate_content(full_prompt)
+        
+        st.session_state.messages.append({"role": "assistant", "content": response.text})
+        st.chat_message("assistant").write(response.text)
+        
+    except Exception as e:
+        st.error(f"Terjadi masalah: {e}")
+        st.info("Tips: Tunggu 10 detik lalu coba lagi (mungkin karena limit kuota gratis).")
