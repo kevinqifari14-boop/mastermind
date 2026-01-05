@@ -1,6 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
 import urllib.parse
+import random
+import time
 
 # --- CONFIG HALAMAN ---
 st.set_page_config(page_title="Mastermind School", page_icon="🏫", layout="wide")
@@ -20,7 +22,6 @@ def load_model():
 model = load_model()
 
 # 3. KONSISTENSI KARAKTER (Base Prompt)
-# Edit bagian ini untuk merubah penampilan karakter utama kamu!
 BASE_CHARACTER = "A high school boy, black messy hair, square glasses, Indonesian white and grey high school uniform, anime style, high quality."
 
 # 4. INISIALISASI SESSION STATE
@@ -48,29 +49,22 @@ with st.sidebar:
 # --- MAIN INTERFACE ---
 st.title("🎓 The Mastermind: School Takeover")
 
+# Tampilkan sejarah chat
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        # Tampilkan gambar jika ada di dalam pesan assistant
         if "image_url" in msg:
             st.image(msg["image_url"], use_container_width=True)
 
 # 5. LOGIKA INPUT & GENERASI GAMBAR
-# 5. LOGIKA INPUT & GENERASI GAMBAR (VERSI STABIL)
 if prompt := st.chat_input("Ketik strategimu..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    st.rerun() # Refresh agar chat user muncul duluan
+    st.rerun()
 
-# Cek pesan terakhir, jika dari user, maka assistant harus jawab
+# Logika Assistant menjawab (dipisahkan agar tidak error indentasi)
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     user_prompt = st.session_state.messages[-1]["content"]
     
-   import random
-import time
-
-# ... (kode lainnya tetap sama)
-
-# Di dalam bagian "if prompt :=" atau "if messages last role user":
     with st.chat_message("assistant"):
         with st.spinner("Game Master sedang menyusun skenario & ilustrasi..."): 
             try:
@@ -78,7 +72,8 @@ import time
                 system_prompt = (
                     "Kamu GM RPG Sekolah. TEMA: Strategi menggulingkan OSIS elit. "
                     "LOKASI: SMA Pelita Jaya. "
-                    "WAJIB: Berikan satu baris di akhir pesan: IMAGE_PROMPT: [1 deskripsi suasana singkat dalam Bahasa Inggris]"
+                    "WAJIB: Berikan narasi dalam Bahasa Indonesia. "
+                    "WAJIB: Di akhir pesan tambahkan IMAGE_PROMPT: [deskripsi suasana dalam English]"
                 )
                 
                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-3:]])
@@ -94,21 +89,16 @@ import time
                     img_desc = parts[1].strip().replace("[", "").replace("]", "").replace(".", "")
                 else:
                     narasi = ai_text
-                    img_desc = "high school hallway students"
+                    img_desc = "high school student planning in classroom"
 
-                # 3. GENERASI URL GAMBAR (Optimasi Link)
-                # Gunakan seed acak agar gambar tidak macet di satu versi
+                # 3. GENERASI URL GAMBAR
                 seed_val = random.randint(1, 99999)
-                # Tambahkan parameter 'nologo=true' dan 'flux' agar lebih bagus
-                clean_desc = urllib.parse.quote(f"{BASE_CHARACTER}, {img_desc}, cinematic anime style, 4k")
+                clean_desc = urllib.parse.quote(f"{BASE_CHARACTER}, {img_desc}, cinematic anime style")
                 image_url = f"https://pollinations.ai/p/{clean_desc}?width=1024&height=512&seed={seed_val}&model=flux&nologo=true"
 
                 # 4. TAMPILKAN HASIL
                 st.markdown(narasi)
-                
-                # Trik: Gunakan st.image dengan handle error sederhana
-                placeholder = st.empty()
-                placeholder.image(image_url, caption="Ilustrasi Kejadian (Sedang Memuat...)", use_container_width=True)
+                st.image(image_url, caption="Ilustrasi Kejadian", use_container_width=True)
                 
                 # Simpan ke memori
                 st.session_state.messages.append({
@@ -119,4 +109,3 @@ import time
                 
             except Exception as e:
                 st.error(f"Gagal memuat AI: {e}")
-
