@@ -1,14 +1,15 @@
 import streamlit as st
 import google.generativeai as genai
+import urllib.parse
 
 # --- CONFIG HALAMAN ---
 st.set_page_config(page_title="Mastermind School", page_icon="🏫", layout="wide")
 
-# 1. API KEY
+# 1. API KEY GEMINI
 API_KEY = "AIzaSyDAu43dIY8KANIsxoNs2HZxBJ8_-GAQrRI"
 genai.configure(api_key=API_KEY)
 
-# 2. LOAD MODEL
+# 2. LOAD MODEL GEMINI
 @st.cache_resource
 def load_model():
     for m in genai.list_models():
@@ -18,12 +19,14 @@ def load_model():
 
 model = load_model()
 
-# 3. INISIALISASI SESSION STATE
-if "reputasi" not in st.session_state:
-    st.session_state.reputasi = 10
-if "pengaruh" not in st.session_state:
-    st.session_state.pengaruh = 5
+# 3. KONSISTENSI KARAKTER (Base Prompt)
+# Edit bagian ini untuk merubah penampilan karakter utama kamu!
+BASE_CHARACTER = "A high school boy, black messy hair, square glasses, Indonesian white and grey high school uniform, anime style, high quality."
+
+# 4. INISIALISASI SESSION STATE
 if "messages" not in st.session_state:
+    st.session_state.reputasi = 10
+    st.session_state.pengaruh = 5
     st.session_state.messages = []
     intro = "Selamat datang, Mastermind. OSIS elit menguasai sekolah. Kamu mulai dari nol di pojok kelas. Apa langkah pertamamu?"
     st.session_state.messages.append({"role": "assistant", "content": intro})
@@ -39,44 +42,62 @@ with st.sidebar:
     st.divider()
     if st.button("Mulai Ulang Game"):
         for key in ["reputasi", "pengaruh", "messages"]:
-            del st.session_state[key]
+            if key in st.session_state: del st.session_state[key]
         st.rerun()
 
-# --- MAIN CHAT ---
+# --- MAIN INTERFACE ---
 st.title("🎓 The Mastermind: School Takeover")
 
 for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        # Tampilkan gambar jika ada di dalam pesan assistant
+        if "image_url" in msg:
+            st.image(msg["image_url"], use_container_width=True)
 
-# 4. INPUT PEMAIN DENGAN LOGIKA KONSISTENSI
+# 5. LOGIKA INPUT & GENERASI GAMBAR
 if prompt := st.chat_input("Ketik strategimu..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Game Master sedang berpikir..."): 
+        with st.spinner("Game Master sedang menyusun skenario & ilustrasi..."): 
             try:
-                # KUNCI TEMA DI SINI (System Instruction yang diperketat)
+                # Prompt untuk Cerita
                 system_prompt = (
-                    "KAMU ADALAH GAME MASTER UNTUK RPG SEKOLAH. "
-                    "TEMA: Strategi menggulingkan kekuasaan OSIS elit di sekolah menengah. "
-                    "LOKASI: Hanya di lingkungan sekolah (kelas, kantin, lapangan, ruang guru). "
-                    "DILARANG KERAS berpindah ke tema futuristik, perusahaan, atau sci-fi. "
-                    f"STATUS SAAT INI: Reputasi {st.session_state.reputasi}, Pengaruh {st.session_state.pengaruh}. "
-                    "Gunakan gaya bahasa remaja yang serius tapi dramatis tentang politik sekolah."
+                    "Kamu GM RPG Sekolah. TEMA: Strategi menggulingkan OSIS. "
+                    "LOKASI: Hanya di sekolah. DILARANG sci-fi/perusahaan. "
+                    "WAJIB: Berikan satu baris singkat di akhir pesan dengan format: "
+                    "IMAGE_PROMPT: [deskripsi suasana adegan dalam bahasa inggris]"
                 )
-
-                # MENGIRIM SELURUH RIWAYAT (Agar AI ingat cerita sebelumnya)
-                # Kita ambil 5 pesan terakhir saja agar tidak terlalu berat
-                history_context = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
                 
-                full_query = f"{system_prompt}\n\nRIWAYAT CERITA:\n{history_context}\n\nAKSI TERBARU PEMAIN: {prompt}"
+                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-3:]])
+                full_query = f"{system_prompt}\n\n{history}\n\nPemain: {prompt}"
                 
                 response = model.generate_content(full_query)
-                ai_response = response.text
+                ai_text = response.text
                 
-                st.markdown(ai_response)
-                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                # Pemisahan teks narasi dan prompt gambar
+                narasi = ai_text.split("IMAGE_PROMPT:")[0]
+                image_desc = "high school hallway" # default jika gagal parse
+                if "IMAGE_PROMPT:" in ai_text:
+                    image_desc = ai_text.split("IMAGE_PROMPT:")[1].strip()
+
+                # Membuat URL Gambar (Pollinations AI)
+                combined_prompt = f"{BASE_CHARACTER} {image_desc}, cinematic lighting, detailed background"
+                encoded_prompt = urllib.parse.quote(combined_prompt)
+                image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=512&seed=42&model=flux"
+
+                # Tampilkan Hasil
+                st.markdown(narasi)
+                st.image(image_url, caption="Ilustrasi Kejadian")
+                
+                # Simpan ke history
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": narasi, 
+                    "image_url": image_url
+                })
                 
             except Exception as e:
                 st.error(f"Terjadi masalah: {e}")
