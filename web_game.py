@@ -1,8 +1,5 @@
 import streamlit as st
 import google.generativeai as genai
-import urllib.parse
-import random
-import time
 
 # --- CONFIG HALAMAN ---
 st.set_page_config(page_title="Mastermind School", page_icon="🏫", layout="wide")
@@ -21,10 +18,7 @@ def load_model():
 
 model = load_model()
 
-# 3. KONSISTENSI KARAKTER (Base Prompt)
-BASE_CHARACTER = "A high school boy, black messy hair, square glasses, Indonesian white and grey high school uniform, anime style, high quality."
-
-# 4. INISIALISASI SESSION STATE
+# 3. INISIALISASI SESSION STATE
 if "messages" not in st.session_state:
     st.session_state.reputasi = 10
     st.session_state.pengaruh = 5
@@ -43,7 +37,8 @@ with st.sidebar:
     st.divider()
     if st.button("Mulai Ulang Game"):
         for key in ["reputasi", "pengaruh", "messages"]:
-            if key in st.session_state: del st.session_state[key]
+            if key in st.session_state: 
+                del st.session_state[key]
         st.rerun()
 
 # --- MAIN INTERFACE ---
@@ -53,59 +48,36 @@ st.title("🎓 The Mastermind: School Takeover")
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if "image_url" in msg:
-            st.image(msg["image_url"], use_container_width=True)
 
-# 5. LOGIKA INPUT & GENERASI GAMBAR
+# 4. LOGIKA INPUT PEMAIN
 if prompt := st.chat_input("Ketik strategimu..."):
+    # Simpan pesan user
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.rerun()
 
-# Logika Assistant menjawab (dipisahkan agar tidak error indentasi)
+# Logika Assistant menjawab
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     user_prompt = st.session_state.messages[-1]["content"]
     
     with st.chat_message("assistant"):
-        with st.spinner("Game Master sedang menyusun skenario & ilustrasi..."): 
+        with st.spinner("Game Master sedang berpikir..."): 
             try:
-                # 1. Instruksi super ketat untuk AI
+                # Instruksi sistem yang diperketat agar tetap di tema sekolah
                 system_prompt = (
                     "Kamu GM RPG Sekolah. TEMA: Strategi menggulingkan OSIS elit. "
-                    "LOKASI: SMA Pelita Jaya. "
-                    "WAJIB: Berikan narasi dalam Bahasa Indonesia. "
-                    "WAJIB: Di akhir pesan tambahkan IMAGE_PROMPT: [deskripsi suasana dalam English]"
+                    "LOKASI: SMA Pelita Jaya. DILARANG sci-fi atau tema luar sekolah. "
+                    "Gunakan Bahasa Indonesia yang dramatis."
                 )
                 
-                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-3:]])
-                full_query = f"{system_prompt}\n\n{history}\n\nPemain: {user_prompt}"
+                # Mengirimkan riwayat agar AI konsisten
+                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
+                full_query = f"{system_prompt}\n\nRIWAYAT:\n{history}\n\nPemain: {user_prompt}"
                 
                 response = model.generate_content(full_query)
-                ai_text = response.text
+                ai_response = response.text
                 
-                # 2. Pisahkan Narasi dan Deskripsi Gambar
-                if "IMAGE_PROMPT:" in ai_text:
-                    parts = ai_text.split("IMAGE_PROMPT:")
-                    narasi = parts[0].strip()
-                    img_desc = parts[1].strip().replace("[", "").replace("]", "").replace(".", "")
-                else:
-                    narasi = ai_text
-                    img_desc = "high school student planning in classroom"
-
-                # 3. GENERASI URL GAMBAR
-                seed_val = random.randint(1, 99999)
-                clean_desc = urllib.parse.quote(f"{BASE_CHARACTER}, {img_desc}, cinematic anime style")
-                image_url = f"https://pollinations.ai/p/{clean_desc}?width=1024&height=512&seed={seed_val}&model=flux&nologo=true"
-
-                # 4. TAMPILKAN HASIL
-                st.markdown(narasi)
-                st.image(image_url, caption="Ilustrasi Kejadian", use_container_width=True)
+                # Tampilkan jawaban
+                st.markdown(ai_response)
                 
                 # Simpan ke memori
-                st.session_state.messages.append({
-                    "role": "assistant", 
-                    "content": narasi, 
-                    "image_url": image_url
-                })
-                
-            except Exception as e:
-                st.error(f"Gagal memuat AI: {e}")
+                st.session_state.messages.append({"role": "assistant", "content
