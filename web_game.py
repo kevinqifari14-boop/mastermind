@@ -18,7 +18,7 @@ def load_model():
 
 model = load_model()
 
-# 3. INISIALISASI STATUS GAME (SESSION STATE)
+# 3. INISIALISASI SESSION STATE
 if "reputasi" not in st.session_state:
     st.session_state.reputasi = 10
 if "pengaruh" not in st.session_state:
@@ -28,60 +28,54 @@ if "messages" not in st.session_state:
     intro = "Selamat datang, Mastermind. OSIS elit menguasai sekolah. Kamu mulai dari nol di pojok kelas. Apa langkah pertamamu?"
     st.session_state.messages.append({"role": "assistant", "content": intro})
 
-# --- SIDEBAR: STATUS PLAYER (FITUR 1) ---
+# --- SIDEBAR: STATUS PLAYER ---
 with st.sidebar:
     st.title("📊 Status Strategi")
     st.divider()
-    
-    # Menampilkan Bar Reputasi
     st.write(f"**Reputasi:** {st.session_state.reputasi}/100")
     st.progress(st.session_state.reputasi / 100)
-    
-    # Menampilkan Bar Pengaruh
     st.write(f"**Pengaruh:** {st.session_state.pengaruh}/100")
     st.progress(st.session_state.pengaruh / 100)
-    
     st.divider()
-    st.caption("Tips: Setiap tindakanmu mempengaruhi angka di atas. Jangan biarkan Reputasi menjadi 0!")
-    
     if st.button("Mulai Ulang Game"):
-        st.session_state.reputasi = 10
-        st.session_state.pengaruh = 5
-        st.session_state.messages = []
+        for key in ["reputasi", "pengaruh", "messages"]:
+            del st.session_state[key]
         st.rerun()
 
-# --- MAIN CHAT INTERFACE ---
+# --- MAIN CHAT ---
 st.title("🎓 The Mastermind: School Takeover")
 
-# Tampilkan sejarah chat
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-# 4. INPUT PEMAIN DENGAN FITUR LOADING
-if prompt := st.chat_input("Ketik strategimu di sini..."):
-    # Tampilkan pesan user
+# 4. INPUT PEMAIN DENGAN LOGIKA KONSISTENSI
+if prompt := st.chat_input("Ketik strategimu..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
 
-    # FITUR LOADING: Spinner akan muncul saat AI sedang berpikir
     with st.chat_message("assistant"):
-        with st.spinner("Game Master sedang menyusun skenario..."): 
+        with st.spinner("Game Master sedang berpikir..."): 
             try:
-                # Instruksi sistem
-                system_instruction = (
-                    f"Kamu adalah Game Master 'The Mastermind'. "
-                    f"Status saat ini: Reputasi {st.session_state.reputasi}, Pengaruh {st.session_state.pengaruh}. "
-                    "Berikan narasi seru, tunjukkan perubahan status jika ada, dan berikan 3 opsi aksi."
+                # KUNCI TEMA DI SINI (System Instruction yang diperketat)
+                system_prompt = (
+                    "KAMU ADALAH GAME MASTER UNTUK RPG SEKOLAH. "
+                    "TEMA: Strategi menggulingkan kekuasaan OSIS elit di sekolah menengah. "
+                    "LOKASI: Hanya di lingkungan sekolah (kelas, kantin, lapangan, ruang guru). "
+                    "DILARANG KERAS berpindah ke tema futuristik, perusahaan, atau sci-fi. "
+                    f"STATUS SAAT INI: Reputasi {st.session_state.reputasi}, Pengaruh {st.session_state.pengaruh}. "
+                    "Gunakan gaya bahasa remaja yang serius tapi dramatis tentang politik sekolah."
                 )
+
+                # MENGIRIM SELURUH RIWAYAT (Agar AI ingat cerita sebelumnya)
+                # Kita ambil 5 pesan terakhir saja agar tidak terlalu berat
+                history_context = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
                 
-                # Panggil AI
-                response = model.generate_content(f"{system_instruction}\n\nPemain: {prompt}")
+                full_query = f"{system_prompt}\n\nRIWAYAT CERITA:\n{history_context}\n\nAKSI TERBARU PEMAIN: {prompt}"
+                
+                response = model.generate_content(full_query)
                 ai_response = response.text
                 
-                # Tampilkan jawaban
                 st.markdown(ai_response)
-                
-                # Simpan ke memori
                 st.session_state.messages.append({"role": "assistant", "content": ai_response})
                 
             except Exception as e:
