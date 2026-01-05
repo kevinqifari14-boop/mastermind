@@ -65,43 +65,52 @@ if prompt := st.chat_input("Ketik strategimu..."):
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     user_prompt = st.session_state.messages[-1]["content"]
     
+   import random
+import time
+
+# ... (kode lainnya tetap sama)
+
+# Di dalam bagian "if prompt :=" atau "if messages last role user":
     with st.chat_message("assistant"):
         with st.spinner("Game Master sedang menyusun skenario & ilustrasi..."): 
             try:
-                # Prompt untuk Cerita (Lebih ketat agar IMAGE_PROMPT selalu ada)
+                # 1. Instruksi super ketat untuk AI
                 system_prompt = (
                     "Kamu GM RPG Sekolah. TEMA: Strategi menggulingkan OSIS elit. "
-                    "LOKASI: Hanya di SMA Pelita Jaya. "
-                    "WAJIB: Di akhir jawaban, tambahkan baris: IMAGE_PROMPT: [deskripsi adegan singkat dalam bahasa Inggris]"
+                    "LOKASI: SMA Pelita Jaya. "
+                    "WAJIB: Berikan satu baris di akhir pesan: IMAGE_PROMPT: [1 deskripsi suasana singkat dalam Bahasa Inggris]"
                 )
                 
-                # Mengirim riwayat singkat
                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-3:]])
                 full_query = f"{system_prompt}\n\n{history}\n\nPemain: {user_prompt}"
                 
                 response = model.generate_content(full_query)
                 ai_text = response.text
                 
-                # Parsing Teks & Prompt Gambar
+                # 2. Pisahkan Narasi dan Deskripsi Gambar
                 if "IMAGE_PROMPT:" in ai_text:
-                    narasi, img_desc = ai_text.split("IMAGE_PROMPT:")
-                    img_desc = img_desc.strip().replace("[", "").replace("]", "")
+                    parts = ai_text.split("IMAGE_PROMPT:")
+                    narasi = parts[0].strip()
+                    img_desc = parts[1].strip().replace("[", "").replace("]", "").replace(".", "")
                 else:
                     narasi = ai_text
-                    img_desc = "high school student planning in classroom"
+                    img_desc = "high school hallway students"
 
-                # Membuat URL Gambar yang lebih bersih
-                # Kita gunakan seed acak agar gambar tidak selalu sama
-                import random
-                seed = random.randint(1, 1000)
-                clean_prompt = urllib.parse.quote(f"{BASE_CHARACTER}, {img_desc}, anime style, high detail")
-                image_url = f"https://pollinations.ai/p/{clean_prompt}?width=1024&height=512&seed={seed}&model=flux"
+                # 3. GENERASI URL GAMBAR (Optimasi Link)
+                # Gunakan seed acak agar gambar tidak macet di satu versi
+                seed_val = random.randint(1, 99999)
+                # Tambahkan parameter 'nologo=true' dan 'flux' agar lebih bagus
+                clean_desc = urllib.parse.quote(f"{BASE_CHARACTER}, {img_desc}, cinematic anime style, 4k")
+                image_url = f"https://pollinations.ai/p/{clean_desc}?width=1024&height=512&seed={seed_val}&model=flux&nologo=true"
 
-                # Tampilkan
+                # 4. TAMPILKAN HASIL
                 st.markdown(narasi)
-                st.image(image_url, caption="Ilustrasi Kejadian")
                 
-                # Simpan ke history
+                # Trik: Gunakan st.image dengan handle error sederhana
+                placeholder = st.empty()
+                placeholder.image(image_url, caption="Ilustrasi Kejadian (Sedang Memuat...)", use_container_width=True)
+                
+                # Simpan ke memori
                 st.session_state.messages.append({
                     "role": "assistant", 
                     "content": narasi, 
@@ -109,4 +118,5 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                 })
                 
             except Exception as e:
-                st.error(f"Terjadi masalah: {e}")
+                st.error(f"Gagal memuat AI: {e}")
+
