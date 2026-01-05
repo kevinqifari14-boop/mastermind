@@ -51,33 +51,37 @@ for msg in st.session_state.messages:
 
 # 4. LOGIKA INPUT PEMAIN
 if prompt := st.chat_input("Ketik strategimu..."):
-    # Simpan pesan user
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.rerun()
 
-# Logika Assistant menjawab
+# Logika respon AI (hanya jalan jika pesan terakhir dari user)
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     user_prompt = st.session_state.messages[-1]["content"]
     
     with st.chat_message("assistant"):
         with st.spinner("Game Master sedang berpikir..."): 
             try:
-                # Instruksi sistem yang diperketat agar tetap di tema sekolah
+                # Instruksi sistem yang mengunci tema sekolah
                 system_prompt = (
-                    "Kamu GM RPG Sekolah. TEMA: Strategi menggulingkan OSIS elit. "
-                    "LOKASI: SMA Pelita Jaya. DILARANG sci-fi atau tema luar sekolah. "
-                    "Gunakan Bahasa Indonesia yang dramatis."
+                    "Kamu adalah Game Master RPG bertema politik sekolah. "
+                    "LOKASI: SMA Pelita Jaya. TEMA: Strategi menggulingkan OSIS korup. "
+                    "DILARANG keras pindah ke tema fiksi ilmiah atau perusahaan. "
+                    "Berikan narasi pendek yang seru dan berikan 3 pilihan aksi di akhir."
                 )
                 
-                # Mengirimkan riwayat agar AI konsisten
+                # Gunakan 5 pesan terakhir sebagai konteks agar tidak lupa tema
                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
-                full_query = f"{system_prompt}\n\nRIWAYAT:\n{history}\n\nPemain: {user_prompt}"
+                full_query = f"{system_prompt}\n\nRIWAYAT:\n{history}\n\nAKSI PEMAIN: {user_prompt}"
                 
                 response = model.generate_content(full_query)
                 ai_response = response.text
                 
-                # Tampilkan jawaban
+                # Tampilkan dan simpan
                 st.markdown(ai_response)
+                st.session_state.messages.append({"role": "assistant", "content": ai_response})
                 
-                # Simpan ke memori
-                st.session_state.messages.append({"role": "assistant", "content
+            except Exception as e:
+                if "429" in str(e):
+                    st.error("Kuota Gemini habis! Tunggu 60 detik ya.")
+                else:
+                    st.error(f"Gagal memuat AI: {e}")
