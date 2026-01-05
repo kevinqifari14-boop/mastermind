@@ -56,39 +56,48 @@ for msg in st.session_state.messages:
             st.image(msg["image_url"], use_container_width=True)
 
 # 5. LOGIKA INPUT & GENERASI GAMBAR
+# 5. LOGIKA INPUT & GENERASI GAMBAR (VERSI STABIL)
 if prompt := st.chat_input("Ketik strategimu..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
+    st.rerun() # Refresh agar chat user muncul duluan
 
+# Cek pesan terakhir, jika dari user, maka assistant harus jawab
+if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+    user_prompt = st.session_state.messages[-1]["content"]
+    
     with st.chat_message("assistant"):
         with st.spinner("Game Master sedang menyusun skenario & ilustrasi..."): 
             try:
-                # Prompt untuk Cerita
+                # Prompt untuk Cerita (Lebih ketat agar IMAGE_PROMPT selalu ada)
                 system_prompt = (
-                    "Kamu GM RPG Sekolah. TEMA: Strategi menggulingkan OSIS. "
-                    "LOKASI: Hanya di sekolah. DILARANG sci-fi/perusahaan. "
-                    "WAJIB: Berikan satu baris singkat di akhir pesan dengan format: "
-                    "IMAGE_PROMPT: [deskripsi suasana adegan dalam bahasa inggris]"
+                    "Kamu GM RPG Sekolah. TEMA: Strategi menggulingkan OSIS elit. "
+                    "LOKASI: Hanya di SMA Pelita Jaya. "
+                    "WAJIB: Di akhir jawaban, tambahkan baris: IMAGE_PROMPT: [deskripsi adegan singkat dalam bahasa Inggris]"
                 )
                 
+                # Mengirim riwayat singkat
                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-3:]])
-                full_query = f"{system_prompt}\n\n{history}\n\nPemain: {prompt}"
+                full_query = f"{system_prompt}\n\n{history}\n\nPemain: {user_prompt}"
                 
                 response = model.generate_content(full_query)
                 ai_text = response.text
                 
-                # Pemisahan teks narasi dan prompt gambar
-                narasi = ai_text.split("IMAGE_PROMPT:")[0]
-                image_desc = "high school hallway" # default jika gagal parse
+                # Parsing Teks & Prompt Gambar
                 if "IMAGE_PROMPT:" in ai_text:
-                    image_desc = ai_text.split("IMAGE_PROMPT:")[1].strip()
+                    narasi, img_desc = ai_text.split("IMAGE_PROMPT:")
+                    img_desc = img_desc.strip().replace("[", "").replace("]", "")
+                else:
+                    narasi = ai_text
+                    img_desc = "high school student planning in classroom"
 
-                # Membuat URL Gambar (Pollinations AI)
-                combined_prompt = f"{BASE_CHARACTER} {image_desc}, cinematic lighting, detailed background"
-                encoded_prompt = urllib.parse.quote(combined_prompt)
-                image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=512&seed=42&model=flux"
+                # Membuat URL Gambar yang lebih bersih
+                # Kita gunakan seed acak agar gambar tidak selalu sama
+                import random
+                seed = random.randint(1, 1000)
+                clean_prompt = urllib.parse.quote(f"{BASE_CHARACTER}, {img_desc}, anime style, high detail")
+                image_url = f"https://pollinations.ai/p/{clean_prompt}?width=1024&height=512&seed={seed}&model=flux"
 
-                # Tampilkan Hasil
+                # Tampilkan
                 st.markdown(narasi)
                 st.image(image_url, caption="Ilustrasi Kejadian")
                 
