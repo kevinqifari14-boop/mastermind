@@ -4,6 +4,19 @@ import time
 # --- CONFIG HALAMAN ---
 st.set_page_config(page_title="The Mastermind: Moriarty Protocol", page_icon="🕷️", layout="wide")
 
+# --- STYLE ---
+st.markdown("""
+<style>
+div.stButton > button {
+    width: 100%;
+    text-align: left;
+    white-space: pre-wrap;
+    height: auto;
+    padding: 1rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # --- GAME CONSTANTS ---
 # Moriarty-level difficulty requires hidden flags (state)
 # Kita simpan inventory/clue di session_state['flags']
@@ -39,6 +52,7 @@ GAME_SCENES = {
             "Tentu saja itu palsu, ditaruh oleh anak buah Kevin. Kamu langsung dikeluarkan.\n"
             "**Pelajaran:** Jangan mencolok sebelum punya kuasa."
         ),
+        "choices": {"1": "Ulangi Misi"},
         "next": "restart"
     },
     "game_over_instan_2": {
@@ -48,6 +62,7 @@ GAME_SCENES = {
             "Besoknya kamu terbangun di Rumah Sakit dengan kaki patah. 'Kecelakaan', katanya.\n"
             "**Pelajaran:** Jangan menyerang raja tanpa pasukan."
         ),
+        "choices": {"1": "Ulangi Misi"},
         "next": "restart"
     },
 
@@ -232,7 +247,7 @@ GAME_SCENES = {
             "Kevin diseret pergi. Kamu tidak jadi Ketua OSIS. Kamu menjadi orang yang menunjuk Ketua OSIS.\n"
             "Kamu adalah Penguasa Bayangan SMA Pelita Jaya."
         ),
-        "choices": {"1": "Selesai"}, "next": "restart"
+        "choices": {"1": "Main Lagi (Restart)"}, "next": "restart"
     },
     "ending_political_victory": {
         "text": (
@@ -241,7 +256,7 @@ GAME_SCENES = {
             "Kamu dipuji sebagai pahlawan yang meredam kerusuhan.\n"
             "Kamu terpilih secara aklamasi. Sekolah damai."
         ),
-        "choices": {"1": "Selesai"}, "next": "restart"
+        "choices": {"1": "Main Lagi (Restart)"}, "next": "restart"
     },
     "ending_cyber_victory": {
         "text": (
@@ -251,7 +266,7 @@ GAME_SCENES = {
             "Video Kevin menyuap Kepsek tayang live. Game over buat Kevin.\n"
             "Kamu menghilang dari sekolah, menjadi legenda urban hacker."
         ),
-        "choices": {"1": "Selesai"}, "next": "restart"
+        "choices": {"1": "Main Lagi (Restart)"}, "next": "restart"
     },
     "ending_duel": {
         "text": (
@@ -260,31 +275,57 @@ GAME_SCENES = {
             "Keduanya dikeluarkan. OSIS dibubarkan. Sekolah jadi anarkis tanpa pemimpin.\n"
             "Kamu menang, tapi dengan harga segalanya."
         ),
-        "choices": {"1": "Selesai"}, "next": "restart"
+        "choices": {"1": "Main Lagi (Restart)"}, "next": "restart"
     },
     
 
     # --- MORE DEATH TRAPS ---
     "game_over_trap_loker": {
         "text": "Alarm berbunyi. Itu jebakan magnetik. Kamu tertangkap basah maling. Tamat.",
+        "choices": {"1": "Ulangi Misi"},
         "next": "restart"
     },
     "game_over_betrayal": {
         "text": "Sarah terlalu takut pada Kevin. Dia melaporkanmu. Kamu dikepung.",
+        "choices": {"1": "Ulangi Misi"},
         "next": "restart"
     },
     "game_over_chaos_failed": {
         "text": "Boim menyerang tanpa rencana dan dikeroyok massa OSIS. Kamu kehilangan pion.",
+        "choices": {"1": "Ulangi Misi"},
         "next": "restart"
     },
     "game_over_hacked": {
         "text": "Password Salah. Sistem mengunci ruangan. Gas tidur dilepaskan (oke ini agak lebay untuk sekolah, tapi Kevin itu gila).",
+        "choices": {"1": "Ulangi Misi"},
         "next": "restart"
     },
     "game_over_beatdown": {
         "text": "Kamu bukan petarung. Kevin menghajarmu habis-habisan.",
+        "choices": {"1": "Ulangi Misi"},
+        "next": "restart"
+    },
+     "game_over_jail": {
+        "text": "Kamu ditangkap Polisi karena menyerahkan bukti curian. Kevin tertawa. Tamat.",
+        "choices": {"1": "Ulangi Misi"},
+        "next": "restart"
+    },
+     "game_over_no_proof": {
+        "text": "Kamu membuang bukti. Polisi tidak menemukan apa-apa, tapi Kevin menuduhmu mencemarkan nama baik. Kamu dikeluarkan.",
+        "choices": {"1": "Ulangi Misi"},
+        "next": "restart"
+    },
+     "game_over_anarchy": {
+        "text": "Sekolah terbakar habis. Semua orang ditangkap. Kamu menjadi raja abu.",
+        "choices": {"1": "Ulangi Misi"},
+        "next": "restart"
+    },
+     "game_over_fall": {
+        "text": "Kamu melompat ke pohon... dan rantingnya patah. Kamu jatuh. Kevin memotretmu yang sedang kesakitan.",
+        "choices": {"1": "Ulangi Misi"},
         "next": "restart"
     }
+
 }
 
 # --- INITIALIZATION ---
@@ -305,64 +346,82 @@ def reset_game():
 st.title("🕷️ Mastermind: Moriarty Protocol")
 st.caption("Difficulty: EXTREME. Satu kesalahan = Game Over.")
 
-# Chat Display
-for msg in st.session_state.messages:
-    color = "red" if msg["role"] == "assistant" else "blue"
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Container chat agar tombol selalu di bawah
+chat_container = st.container()
 
-# --- CORE LOGIC ---
-if prompt := st.chat_input("Tentukan langkahmu (1/2/3)..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# Logic Display Chat
+with chat_container:
+    for msg in st.session_state.messages:
+        color = "red" if msg["role"] == "assistant" else "blue"
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+# --- INPUT AREA (BUTTONS) ---
+st.divider()
+current_id = st.session_state.current_scene
+scene_data = GAME_SCENES.get(current_id)
+user_choice = None
+
+if scene_data and "choices" in scene_data:
+    st.write("👉 **Tentukan Langkahmu:**")
+    # Buat tombol secara dinamis
+    choices = scene_data["choices"]
+    # Sorting keys agar urut 1, 2, 3
+    sorted_keys = sorted(choices.keys())
     
-    current_id = st.session_state.current_scene
-    scene_data = GAME_SCENES.get(current_id)
+    # Gunakan columns biar rapi kalau pendek, atau vertical stack kalau panjang
+    # Untuk deskripsi panjang, lebih baik vertical stack (tanpa columns)
+    for key in sorted_keys:
+        desc = choices[key]
+        if st.button(f"{desc}", key=f"btn_{key}_{current_id}", type="secondary"):
+            user_choice = key
+
+# --- CORE LOGIC PROCESSOR ---
+if user_choice:
+    # Simpan pilihan user ke chat
+    choice_text = scene_data["choices"][user_choice]
+    st.session_state.messages.append({"role": "user", "content": choice_text})
     
-    user_choice = prompt.strip()
     next_id = None
     
     # Logic Handling
-    if scene_data:
-        # 1. Handle Restart
-        if scene_data.get("next") == "restart":
-            reset_game()
+    # 1. Handle Restart
+    if scene_data.get("next") == "restart":
+        reset_game()
+    
+    # 2. Check Next Logic
+    elif "next_logic" in scene_data and user_choice in scene_data["next_logic"]:
+        next_id = scene_data["next_logic"][user_choice]
+    
+    # 3. Check Linear Next
+    elif "next" in scene_data and user_choice == "1":
+        next_id = scene_data["next"]
         
-        # 2. Check Next Logic
-        elif "next_logic" in scene_data and user_choice in scene_data["next_logic"]:
-            next_id = scene_data["next_logic"][user_choice]
-        
-        # 3. Check Linear Next (choice independent, usually for dialogues)
-        elif "next" in scene_data and user_choice == "1":
-            next_id = scene_data["next"]
+    # Process Next Scene
+    if next_id:
+        new_scene = GAME_SCENES.get(next_id)
+        if new_scene:
+            st.session_state.current_scene = next_id
             
-        # Process Next Scene
-        if next_id:
-            new_scene = GAME_SCENES.get(next_id)
-            if new_scene:
-                st.session_state.current_scene = next_id
-                
-                # Update Inventory/Flags if any
-                if "effects" in new_scene:
-                    eff = new_scene["effects"]
-                    if "flag" in eff:
-                        if "inventory" not in st.session_state: st.session_state.inventory = []
-                        st.session_state.inventory.append(eff["flag"])
-                        st.toast(f"ITEM DIDAPAT: {eff['flag']}")
-                
-                # Show Response
-                response_text = new_scene["text"]
-                if new_scene.get("next") == "restart":
-                    response_text += "\n\n(Ketik apapun untuk Restart)"
-                
+            # Update Inventory/Flags if any
+            if "effects" in new_scene:
+                eff = new_scene["effects"]
+                if "flag" in eff:
+                    if "inventory" not in st.session_state: st.session_state.inventory = []
+                    st.session_state.inventory.append(eff["flag"])
+                    st.toast(f"ITEM DIDAPAT: {eff['flag']}")
+            
+            # Show Response
+            response_text = new_scene["text"]
+            
+            # Animasi 'Thinking'
+            with chat_container:
                 with st.chat_message("assistant"):
                     with st.spinner("Menganalisis probabilitas..."):
-                        time.sleep(0.7)
+                        time.sleep(0.5)
                         st.markdown(response_text)
-                        st.session_state.messages.append({"role": "assistant", "content": response_text})
-            else:
-                 st.error(f"Bug: Scene {next_id} not found.")
+            
+            st.session_state.messages.append({"role": "assistant", "content": response_text})
+            st.rerun() # Refresh agar tombol update
         else:
-            with st.chat_message("assistant"):
-                st.markdown("🔒 **Langkah tidak valid.** Berikan input yang presisi (1, 2, atau 3). Kesalahan input adalah tanda kelemahan.")
-                
-    st.rerun()
+             st.error(f"Bug: Scene {next_id} not found.")
