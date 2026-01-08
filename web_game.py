@@ -2,17 +2,110 @@ import streamlit as st
 import time
 
 # --- CONFIG HALAMAN ---
-st.set_page_config(page_title="Moriarty School: The Long War (25 Acts)", page_icon="🏫", layout="wide")
+st.set_page_config(page_title="Moriarty School: Gothic Edition", page_icon="🕸️", layout="wide")
 
+# --- CUSTOM CSS: GOTHIC / SPIDER AESTHETIC ---
 st.markdown("""
 <style>
-div.stButton > button {width: 100%; text-align: left; margin-bottom: 8px; height: auto; padding: 15px; border-radius: 10px;}
-.locked-option {color: #888; border: 1px dashed #555; pointer-events: none;}
-.act-header {font-size: 20px; font-weight: bold; color: #FF4B4B; margin-bottom: 10px;}
+@import url('https://fonts.googleapis.com/css2?family=Creepster&family=Metal+Mania&family=Roboto+Mono:wght@400;700&display=swap');
+
+/* BACKGROUND & GLOBAL TEXT */
+.stApp {
+    background-color: #0a0a0a;
+    background-image: radial-gradient(circle at 50% 50%, #1a0505 0%, #000000 100%);
+    color: #e0e0e0;
+}
+
+/* HEADERS */
+h1, h2, h3 {
+    font-family: 'Metal Mania', cursive !important;
+    color: #ff3333 !important;
+    text-shadow: 2px 2px 4px #000000;
+    letter-spacing: 2px;
+}
+
+/* CHAT BUBBLES */
+.stChatMessage {
+    background-color: rgba(20, 0, 0, 0.6) !important;
+    border: 1px solid #4a0000;
+    border-radius: 5px;
+    font-family: 'Roboto Mono', monospace;
+}
+[data-testid="stChatMessageContent"] {
+    color: #dcdcdc !important;
+}
+
+/* BUTTONS */
+div.stButton > button {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 8px;
+    height: auto;
+    padding: 15px;
+    border-radius: 0px;
+    background: linear-gradient(90deg, #1a0000 0%, #330000 100%);
+    color: #ffcccc !important;
+    border: 1px solid #660000;
+    font-family: 'Roboto Mono', monospace;
+    transition: all 0.3s ease;
+}
+div.stButton > button:hover {
+    background: linear-gradient(90deg, #4d0000 0%, #800000 100%);
+    border-color: #ff0000;
+    transform: translateX(5px);
+    box-shadow: -2px 0 10px rgba(255, 0, 0, 0.3);
+}
+
+/* LOCKED BUTTONS */
+.locked-button {
+    background-color: #111 !important;
+    color: #444 !important;
+    border: 1px dashed #333 !important;
+    cursor: not-allowed;
+}
+
+/* SIDEBAR */
+[data-testid="stSidebar"] {
+    background-color: #050505;
+    border-right: 1px solid #330000;
+}
+[data-testid="stSidebar"] h1 {
+    font-family: 'Creepster', cursive !important;
+    font-size: 40px;
+    background: -webkit-linear-gradient(#ff0000, #550000);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* PROGRESS BAR */
+.stProgress > div > div > div > div {
+    background-color: #cc0000;
+}
+
+/* SPIDER WEB DECORATION (CSS ART) */
+.spider-web-corner {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 150px;
+    height: 150px;
+    background: repeating-radial-gradient(
+        circle at 100% 0%, 
+        transparent 0, 
+        transparent 10px, 
+        #330000 11px, 
+        #330000 12px
+    );
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 999;
+}
 </style>
+
+<div class="spider-web-corner"></div>
 """, unsafe_allow_html=True)
 
-# --- GAME DATA & SCENES ---
+# --- GAME DATA (SAME LOGIC, JUST VISUAL UPDATE) ---
 # Struktur: 25 Acts Linear Progression with Branching Outcomes
 GAME_SCENES = {
     # --- ACT 1-3: INTRODUCTION ---
@@ -239,8 +332,6 @@ GAME_SCENES = {
         "req_flag": {"2": ["buku_kas_asli", "kwitansi_palsu", "rekaman_judi"]},
         "next_logic": {"1": "act23_logic", "2": "act23_nuke"}
     },
-    "act22_generic": {"act": 22, "text": "Kamu tidak punya cukup bukti. Terpaksa pakai retorika standar.", "next": "act23_logic"}, # Fallback if flag missing
-
     "act23_nuke": {"act": 23, "text": "**ACT 23: THE GRAND DEBATE (NUKE)**\n\nDi panggung, kamu tidak berdebat. Kamu menyalakan proyektor.\nKamu menunjukan: Kwitansi Palsu, Rekaman Judi, Buku Kas Ganda.\nKevin terdiam. Wajahnya pucat pasi.", "effects": {"rep": 200}, "next": "act24"},
     "act23_logic": {"act": 23, "text": "**ACT 23: THE GRAND DEBATE (LOGIC)**\n\nKamu berdebat sengit soal anggaran. Kevin pintar ngeles. Skor imbang.", "next": "act24"},
 
@@ -262,7 +353,7 @@ GAME_SCENES = {
     "ending_calc": {
         "act": 25,
         "text": "Menghitung validasi suara...",
-        "special": "calc_ending" # Trigger logic in python
+        "special": "calc_ending"
     },
 
     "end_victory": {"text": "🏆 **VICTORY: THE SUPREME LEADER**\n\nKamu menang mutlak (70%+ suara). Kevin di-drop out. Kamu mereformasi sekolah.\nLegendamu akan diceritakan turun temurun.", "next": "restart"},
@@ -286,6 +377,7 @@ if "messages" not in st.session_state:
 
 # --- SIDEBAR PROGRESS ---
 with st.sidebar:
+    st.image("https://img.icons8.com/fluency/96/spider.png", width=50) # Just a placeholder icon
     st.title("🕷️ Moriarty Protocol")
     
     # Hitung progress Act
@@ -296,15 +388,15 @@ with st.sidebar:
     st.progress(min(curr_act/25, 1.0))
     
     st.divider()
-    st.metric("Reputasi", st.session_state.reputasi)
-    st.write("🚩 **Intel & Assets:**")
+    st.metric("Reputasi Hitam", st.session_state.reputasi)
+    st.write("🚩 **Aset Intelijen:**")
     for f in st.session_state.flags:
         st.caption(f"- {f.replace('_', ' ').title()}")
         
-    if st.button("Reset Campaign"): reset_game()
+    if st.button("Hancurkan Ego (Reset)"): reset_game()
 
 # --- MAIN UI ---
-st.title("🏫 The Long War (Campaign Mode)")
+st.title("🕷️ The Long War: Gothic Edition")
 chat_container = st.container()
 
 with chat_container:
@@ -312,7 +404,7 @@ with chat_container:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-# --- INPUT LOGIC ---
+# --- INPUT LOGIC (BUTTONS) ---
 curr_id = st.session_state.current_scene
 scene = GAME_SCENES.get(curr_id)
 
@@ -361,9 +453,9 @@ if scene:
 
             # Render
             if is_locked:
-                st.button(f"{lock_msg} {text}", key=f"locked_{key}", disabled=True)
+                st.button(f"{lock_msg} {text}", key=f"locked_{key}", disabled=True, type="primary")
             else:
-                if st.button(f"👉 {text}", key=f"btn_{key}_{curr_id}"):
+                if st.button(f"�️ {text}", key=f"btn_{key}_{curr_id}"):
                     # Execute
                     st.session_state.messages.append({"role": "user", "content": text})
                     
@@ -375,7 +467,6 @@ if scene:
                     
                     # Fallback special logic for Act 22 (dynamic branch check)
                     if curr_id == "act22" and key == "2" and not next_id:
-                         # Harusnya logic flag check sudah melock tombol, tapi double check
                         pass 
 
                     if next_id:
@@ -397,7 +488,7 @@ if scene:
     
     # Linear continuation (No choices, just text/next)
     elif "next" in scene:
-         if st.button("Lanjutkan..."):
+         if st.button("Lanjutkan Teror..."):
             st.session_state.current_scene = scene["next"]
             new_s = GAME_SCENES[scene["next"]]
             st.session_state.messages.append({"role": "assistant", "content": new_s["text"]})
