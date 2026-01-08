@@ -1,87 +1,368 @@
 import streamlit as st
-import google.generativeai as genai
+import time
 
 # --- CONFIG HALAMAN ---
-st.set_page_config(page_title="Mastermind School", page_icon="🏫", layout="wide")
+st.set_page_config(page_title="The Mastermind: Moriarty Protocol", page_icon="🕷️", layout="wide")
 
-# 1. API KEY GEMINI
-API_KEY = "AIzaSyDAu43dIY8KANIsxoNs2HZxBJ8_-GAQrRI"
-genai.configure(api_key=API_KEY)
+# --- GAME CONSTANTS ---
+# Moriarty-level difficulty requires hidden flags (state)
+# Kita simpan inventory/clue di session_state['flags']
 
-# 2. LOAD MODEL GEMINI
-@st.cache_resource
-def load_model():
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            return genai.GenerativeModel(m.name)
-    return None
+GAME_SCENES = {
+    # --- PROLOGUE: THE SPIDER'S WEB ---
+    "start": {
+        "text": (
+            "🌑 **THE MASTERMIND: MORIARTY PROTOCOL**\n\n"
+            "SMA Pelita Jaya bukan sekadar sekolah. Ini adalah miniatur negara korup.\n"
+            "Ketua OSIS, **Kevin 'The King'**, bukan preman biasa. Dia jenius manipulatif. "
+            "Dia punya mata-mata di setiap kelas. Dia tahu kamu datang sebelum kamu mendaftar.\n\n"
+            "Kamu, **The Consultant**, harus menghancurkannya tanpa terdeteksi.\n"
+            "Langkah pertama: Observasi. Jangan bertindak bodoh."
+        ),
+        "choices": {
+            "1": "Masuk kelas dan perkenalkan diri dengan lantang (Cari perhatian).",
+            "2": "Duduk di pojok, pura-pura baca buku, amati pola interaksi siswa.",
+            "3": "Langsung ke ruang OSIS, tantang Kevin (Assertive)."
+        },
+        "next_logic": {
+            "1": "game_over_instan_1", # Too loud
+            "2": "phase1_observation", # Correct: Silent observer
+            "3": "game_over_instan_2"  # Too arrogant
+        }
+    },
+    
+    # --- BAD ENDINGS (INSTANT) ---
+    "game_over_instan_1": {
+        "text": (
+            "💀 **GAME OVER: THE FOOL**\n\n"
+            "Kamu berteriak lantang. 5 menit kemudian, tasmu digeledah guru BP atas tuduhan membawa narkoba.\n"
+            "Tentu saja itu palsu, ditaruh oleh anak buah Kevin. Kamu langsung dikeluarkan.\n"
+            "**Pelajaran:** Jangan mencolok sebelum punya kuasa."
+        ),
+        "next": "restart"
+    },
+    "game_over_instan_2": {
+        "text": (
+            "💀 **GAME OVER: THE BUG**\n\n"
+            "Kamu masuk ruang OSIS. Kevin tersenyum ramah, menyuguhkan teh.\n"
+            "Besoknya kamu terbangun di Rumah Sakit dengan kaki patah. 'Kecelakaan', katanya.\n"
+            "**Pelajaran:** Jangan menyerang raja tanpa pasukan."
+        ),
+        "next": "restart"
+    },
 
-model = load_model()
+    # --- PHASE 1: OBSERVATION ---
+    "phase1_observation": {
+        "text": (
+            "👁️ Kamu mengamati dalam diam. Kamu menemukan 3 anomali:\n"
+            "A. Bendahara OSIS (Sarah) sering gugup saat melihat Kevin.\n"
+            "B. Preman sekolah (Boim) diam-diam menerima amplop dari Kevin tiap Jumat.\n"
+            "C. CCTV di lorong belakang selalu mati jam 2 siang.\n\n"
+            "Mana titik lemah yang akan kamu eksploitasi? (Pilih dengan bijak, ini menentukan 'Senjata' akhirmu)."
+        ),
+        "choices": {
+            "1": "Dekati Sarah (Eksploitasi Ketakutan).",
+            "2": "Adu domba Boim (Eksploitasi Keserakahan).",
+            "3": "Hacking CCTV (Eksploitasi Keamanan)."
+        },
+        "next_logic": {
+            "1": "path_psychology",
+            "2": "path_chaos",
+            "3": "path_cyber"
+        }
+    },
 
-# 3. INISIALISASI SESSION STATE
+    #Path 1: Psychology (Sarah)
+    "path_psychology": {
+        "text": (
+            "🧠 Kamu mendekati Sarah. Bukan dengan ancaman, tapi empati palsu.\n"
+            "Kamu tahu dia menggelapkan uang karena dipaksa Kevin.\n"
+            "Kamu butuh bukti fisik. Sarah menyimpannya di buku harian di lokernya.\n\n"
+            "Bagaimana cara mengambilnya?"
+        ),
+        "choices": {
+            "1": "Bobol lokernya paksa saat sepi.",
+            "2": "Tukar kunci lokernya saat dia lengah di jam olahraga.",
+            "3": "Yakinkan dia untuk menyerahkannya demi 'keadilan'."
+        },
+        "next_logic": {
+            "1": "game_over_trap_loker",
+            "2": "get_intel_sarah",  # Success
+            "3": "game_over_betrayal" # Sarah cepu
+        }
+    },
+    "get_intel_sarah": {
+        "text": (
+            "🔑 Kunci tertukar sempurna. Kamu dapat buku hariannya.\n"
+            "Isinya detail aliran dana pencucian uang Kevin ke rekening judi online.\n"
+            "**[ITEM DIDAPAT: BUKU HITAM]**\n\n"
+            "Tiba-tiba HP-mu berbunyi. Pesan dari nomor tak dikenal (Kevin).\n"
+            "'Aku tahu kau mengambilnya. Temui aku di Rooftop atau Sarah kena akibatnya.'"
+        ),
+        "effects": {"flag": "buku_hitam", "intel": 100},
+        "choices": {"1": "Ke Rooftop (Konfrontasi)"},
+        "next": "phase2_confrontation"
+    },
+
+    # Path 2: Chaos (Boim)
+    "path_chaos": {
+        "text": (
+            "🔥 Kamu mengirim surat kaleng ke Boim, seolah-olah dari Kevin, yang isinya menghina 'otot kecil' Boim.\n"
+            "Boim mengamuk. Dia ingin menghajar Kevin. Ini kesempatanmu mengendalikan kekacauan.\n\n"
+            "Apa instruksimu ke Boim?"
+        ),
+        "choices": {
+            "1": "Suruh dia serang Kevin sekarang juga.",
+            "2": "Tahan dia. Suruh dia kumpulkan preman lain untuk kudeta terstruktur.",
+            "3": "Beri dia senjata tajam (Eskalasi)."
+        },
+        "next_logic": {
+            "1": "game_over_chaos_failed",
+            "2": "get_army_boim",
+            "3": "game_over_criminal"
+        }
+    },
+    "get_army_boim": {
+        "text": (
+            "🛡️ Boim tunduk padamu karena kamu terlihat tenang. Kamu sekarang punya pasukan bayangan.\n"
+            "**[ITEM DIDAPAT: LOYALITAS PREMAN]**\n\n"
+            "Kevin menyadari pergerakan massa. Dia memblokir semua akses pintu sekolah.\n"
+            "Perang terbuka dimulai."
+        ),
+        "effects": {"flag": "pasukan", "intel": 50},
+        "choices": {"1": "Mulai Revolusi"},
+        "next": "phase2_war"
+    },
+
+    # Path 3: Cyber (CCTV) - HARD MODE
+    "path_cyber": {
+        "text": (
+            "💻 Kamu mencoba meretas server sekolah lewat celah keamanan CCTV.\n"
+            "Firewall Kevin ternyata berlapis. Ada *Honey Pot* (jebakan).\n"
+            "Muncul pop-up: 'PASSWORD REQUIRED'.\n\n"
+            "Hint dari observasi awal: Kevin narsis. Apa passwordnya?"
+        ),
+        "choices": {
+            "1": "Admin123",
+            "2": "TheKingKevin",
+            "3": "PelitaJayaJaya"
+        },
+        "next_logic": {
+            "1": "game_over_hacked",
+            "2": "get_access_cyber",
+            "3": "game_over_hacked"
+        }
+    },
+    "get_access_cyber": {
+        "text": (
+            "🔓 AKSES DITERIMA. Kamu masuk ke database OSIS.\n"
+            "Kamu menemukan rekaman CCTV Kevin sedang menyuap Kepala Sekolah.\n"
+            "**[ITEM DIDAPAT: REKAMAN SKANDAL]**\n\n"
+            "Sistem mendeteksi intrusi. Lokasimu terlacak. Satpam menuju ke arahmu."
+        ),
+        "effects": {"flag": "rekaman", "intel": 150}, # Strongest intel
+        "choices": {"1": "Upload ke Cloud dan Kabur"},
+        "next": "phase2_escape"
+    },
+
+    # --- PHASE 2: THE TRAP (MID GAME) ---
+    "phase2_confrontation": {
+        "text": (
+            "🌪️ **PHASE 2: THE TRAP**\n\n"
+            "Di Rooftop, Kevin tidak sendirian. Dia bersama polisi.\n"
+            "'Dia mencuri buku harian Sarah!' teriak Kevin.\n"
+            "Polisi menatapmu. Kamu memegang barang buktinya.\n\n"
+            "Ini jebakan! Berpikir cepat!"
+        ),
+        "choices": {
+            "1": "Serahkan buku itu dan menyerah.",
+            "2": "Lempar buku itu ke bawah gedung (Hilangkan bukti).",
+            "3": "Buka halaman 45, tunjukkan transaksi atas nama Pak Polisi itu sendiri (Bluff/Gambit)."
+        },
+        "next_logic": {
+            "1": "game_over_jail",
+            "2": "game_over_no_proof",
+            "3": "win_gambit" # Only work if you have high insight from observation logic? (simplified here)
+        }
+    },
+    "phase2_war": {
+        "text": (
+            "⚔️ **PHASE 2: CIVIL WAR**\n\n"
+            "Pasukan Boim vs Pasukan OSIS. Tawuran massal di koridor.\n"
+            "Kepala Sekolah histeris. Kevin mencoba kabur lewat pintu belakang membawa uang kas.\n\n"
+            "Keputusan Jenderal?"
+        ),
+        "choices": {
+            "1": "Perintahkan Boim menghancurkan segalanya (Burn it down).",
+            "2": "Cegat Kevin sendiri di pintu belakang (Duel).",
+            "3": "Lindungi Guru-guru agar mendapat simpati publik."
+        },
+        "next_logic": {
+            "1": "game_over_anarchy",
+            "2": "ending_duel",
+            "3": "ending_political_victory"
+        }
+    },
+    "phase2_escape": {
+        "text": (
+            "🏃 **PHASE 2: MANHUNT**\n\n"
+            "Satu sekolah memburumu. Satpam, Guru, OSIS.\n"
+            "Video sedang di-upload... 80%...\n"
+            "Jalan buntu. Di depan ada Kevin memegang tongkat baseball.\n\n"
+            "Tindakan?"
+        ),
+        "choices": {
+            "1": "Lawan Kevin (Fisik).",
+            "2": "Ulur waktu dengan dialog filosofis (Verbal).",
+            "3": "Lompat ke pohon di sebelah jendela (Parkour)."
+        },
+        "next_logic": {
+            "1": "game_over_beatdown", # Kevin is stronger
+            "2": "ending_cyber_victory", # Time allows upload to finish
+            "3": "game_over_fall"
+        }
+    },
+
+    # --- ENDINGS ---
+    "win_gambit": {
+        "text": (
+            "♟️ **TRUE ENDING: THE PUPPET MASTER**\n\n"
+            "Kamu membuka halaman transaksi suap polisi. Wajah polisi itu pucat.\n"
+            "Kevin terkejut. Kamu tersenyum, 'Gilliranmu, Pak Polisi. Tangkap anak ini atau karir Bapak tamat.'\n"
+            "Kevin diseret pergi. Kamu tidak jadi Ketua OSIS. Kamu menjadi orang yang menunjuk Ketua OSIS.\n"
+            "Kamu adalah Penguasa Bayangan SMA Pelita Jaya."
+        ),
+        "choices": {"1": "Selesai"}, "next": "restart"
+    },
+    "ending_political_victory": {
+        "text": (
+            "🕊️ **GOOD ENDING: THE SAVIOR**\n\n"
+            "Pasukanmu melindungi guru. Kevin tertangkap basah membawa uang kabur.\n"
+            "Kamu dipuji sebagai pahlawan yang meredam kerusuhan.\n"
+            "Kamu terpilih secara aklamasi. Sekolah damai."
+        ),
+        "choices": {"1": "Selesai"}, "next": "restart"
+    },
+    "ending_cyber_victory": {
+        "text": (
+            "📺 **TECH ENDING: EXPOSED**\n\n"
+            "'Kejahatan,' katamu, 'adalah masalah perspektif...'\n"
+            "*PING!* Upload selesai. Seluruh HP siswa berbunyi notifikasi.\n"
+            "Video Kevin menyuap Kepsek tayang live. Game over buat Kevin.\n"
+            "Kamu menghilang dari sekolah, menjadi legenda urban hacker."
+        ),
+        "choices": {"1": "Selesai"}, "next": "restart"
+    },
+    "ending_duel": {
+        "text": (
+            "🗡️ **NEUTRAL ENDING: MUTUALLY ASSURED DESTRUCTION**\n\n"
+            "Kamu dan Kevin baku hantam. Keduanya babak belur masuk RS.\n"
+            "Keduanya dikeluarkan. OSIS dibubarkan. Sekolah jadi anarkis tanpa pemimpin.\n"
+            "Kamu menang, tapi dengan harga segalanya."
+        ),
+        "choices": {"1": "Selesai"}, "next": "restart"
+    },
+    
+
+    # --- MORE DEATH TRAPS ---
+    "game_over_trap_loker": {
+        "text": "Alarm berbunyi. Itu jebakan magnetik. Kamu tertangkap basah maling. Tamat.",
+        "next": "restart"
+    },
+    "game_over_betrayal": {
+        "text": "Sarah terlalu takut pada Kevin. Dia melaporkanmu. Kamu dikepung.",
+        "next": "restart"
+    },
+    "game_over_chaos_failed": {
+        "text": "Boim menyerang tanpa rencana dan dikeroyok massa OSIS. Kamu kehilangan pion.",
+        "next": "restart"
+    },
+    "game_over_hacked": {
+        "text": "Password Salah. Sistem mengunci ruangan. Gas tidur dilepaskan (oke ini agak lebay untuk sekolah, tapi Kevin itu gila).",
+        "next": "restart"
+    },
+    "game_over_beatdown": {
+        "text": "Kamu bukan petarung. Kevin menghajarmu habis-habisan.",
+        "next": "restart"
+    }
+}
+
+# --- INITIALIZATION ---
 if "messages" not in st.session_state:
-    st.session_state.reputasi = 10
-    st.session_state.pengaruh = 5
+    st.session_state.inventory = []
     st.session_state.messages = []
-    intro = "Selamat datang, Mastermind. OSIS elit menguasai sekolah. Kamu mulai dari nol di pojok kelas. Apa langkah pertamamu?"
+    st.session_state.current_scene = "start"
+    
+    # Pesan awal
+    intro = GAME_SCENES["start"]["text"]
     st.session_state.messages.append({"role": "assistant", "content": intro})
 
-# --- SIDEBAR: STATUS PLAYER ---
-with st.sidebar:
-    st.title("📊 Status Strategi")
-    st.divider()
-    st.write(f"**Reputasi:** {st.session_state.reputasi}/100")
-    st.progress(st.session_state.reputasi / 100)
-    st.write(f"**Pengaruh:** {st.session_state.pengaruh}/100")
-    st.progress(st.session_state.pengaruh / 100)
-    st.divider()
-    if st.button("Mulai Ulang Game"):
-        for key in ["reputasi", "pengaruh", "messages"]:
-            if key in st.session_state: 
-                del st.session_state[key]
-        st.rerun()
+def reset_game():
+    for key in list(st.session_state.keys()): del st.session_state[key]
+    st.rerun()
 
-# --- MAIN INTERFACE ---
-st.title("🎓 The Mastermind: School Takeover")
+# --- UI ---
+st.title("🕷️ Mastermind: Moriarty Protocol")
+st.caption("Difficulty: EXTREME. Satu kesalahan = Game Over.")
 
-# Tampilkan sejarah chat
+# Chat Display
 for msg in st.session_state.messages:
+    color = "red" if msg["role"] == "assistant" else "blue"
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# 4. LOGIKA INPUT PEMAIN
-if prompt := st.chat_input("Ketik strategimu..."):
+# --- CORE LOGIC ---
+if prompt := st.chat_input("Tentukan langkahmu (1/2/3)..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    st.rerun()
-
-# Logika respon AI (hanya jalan jika pesan terakhir dari user)
-if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
-    user_prompt = st.session_state.messages[-1]["content"]
     
-    with st.chat_message("assistant"):
-        with st.spinner("Game Master sedang berpikir..."): 
-            try:
-                # Instruksi sistem yang mengunci tema sekolah
-                system_prompt = (
-                    "Kamu adalah Game Master RPG bertema politik sekolah. "
-                    "LOKASI: SMA Pelita Jaya. TEMA: Strategi menggulingkan OSIS korup. "
-                    "DILARANG keras pindah ke tema fiksi ilmiah atau perusahaan. "
-                    "Berikan narasi pendek yang seru dan berikan 3 pilihan aksi di akhir."
-                )
+    current_id = st.session_state.current_scene
+    scene_data = GAME_SCENES.get(current_id)
+    
+    user_choice = prompt.strip()
+    next_id = None
+    
+    # Logic Handling
+    if scene_data:
+        # 1. Handle Restart
+        if scene_data.get("next") == "restart":
+            reset_game()
+        
+        # 2. Check Next Logic
+        elif "next_logic" in scene_data and user_choice in scene_data["next_logic"]:
+            next_id = scene_data["next_logic"][user_choice]
+        
+        # 3. Check Linear Next (choice independent, usually for dialogues)
+        elif "next" in scene_data and user_choice == "1":
+            next_id = scene_data["next"]
+            
+        # Process Next Scene
+        if next_id:
+            new_scene = GAME_SCENES.get(next_id)
+            if new_scene:
+                st.session_state.current_scene = next_id
                 
-                # Gunakan 5 pesan terakhir sebagai konteks agar tidak lupa tema
-                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
-                full_query = f"{system_prompt}\n\nRIWAYAT:\n{history}\n\nAKSI PEMAIN: {user_prompt}"
+                # Update Inventory/Flags if any
+                if "effects" in new_scene:
+                    eff = new_scene["effects"]
+                    if "flag" in eff:
+                        if "inventory" not in st.session_state: st.session_state.inventory = []
+                        st.session_state.inventory.append(eff["flag"])
+                        st.toast(f"ITEM DIDAPAT: {eff['flag']}")
                 
-                response = model.generate_content(full_query)
-                ai_response = response.text
+                # Show Response
+                response_text = new_scene["text"]
+                if new_scene.get("next") == "restart":
+                    response_text += "\n\n(Ketik apapun untuk Restart)"
                 
-                # Tampilkan dan simpan
-                st.markdown(ai_response)
-                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                with st.chat_message("assistant"):
+                    with st.spinner("Menganalisis probabilitas..."):
+                        time.sleep(0.7)
+                        st.markdown(response_text)
+                        st.session_state.messages.append({"role": "assistant", "content": response_text})
+            else:
+                 st.error(f"Bug: Scene {next_id} not found.")
+        else:
+            with st.chat_message("assistant"):
+                st.markdown("🔒 **Langkah tidak valid.** Berikan input yang presisi (1, 2, atau 3). Kesalahan input adalah tanda kelemahan.")
                 
-            except Exception as e:
-                if "429" in str(e):
-                    st.error("Kuota Gemini habis! Tunggu 60 detik ya.")
-                else:
-                    st.error(f"Gagal memuat AI: {e}")
+    st.rerun()
