@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+import os
 
 # --- CONFIG HALAMAN ---
 st.set_page_config(page_title="Moriarty School: Gothic Edition", page_icon="🕸️", layout="wide")
@@ -107,6 +108,146 @@ div.stButton > button:hover {
 
 # --- GAME DATA (SAME LOGIC, JUST VISUAL UPDATE) ---
 # Struktur: 25 Acts Linear Progression with Branching Outcomes
+
+# --- ILLUSTRATION SYSTEM ---
+ILLUSTRATIONS = {
+    # ACT 1-3: Introduction
+    "start": "assets/illustrations/act_01_arrival.png",
+    "act1_win": "assets/illustrations/act_01_arrival.png",
+    "act1_safe": "assets/illustrations/act_01_arrival.png",
+    "act1_rich": "assets/illustrations/act_01_arrival.png",
+    
+    "act2": "assets/illustrations/act_02_invitation.png",
+    "act2_boss": "assets/illustrations/act_02_invitation.png",
+    "act2_spy": "assets/illustrations/act_02_invitation.png",
+    
+    "act3": "assets/illustrations/act_01_arrival.png",  # Reuse arrival for Act 3
+    "act3_win": "assets/illustrations/act_01_arrival.png",
+    "act3_lose": "assets/illustrations/act_01_arrival.png",
+    "act3_smart": "assets/illustrations/act_01_arrival.png",
+    
+    # ACT 4-10: Building the Empire
+    "act4": "assets/illustrations/act_04_basketball.png",
+    "act4_tutor": "assets/illustrations/act_04_basketball.png",
+    "act4_cheat": "assets/illustrations/act_04_basketball.png",
+    "act4_fail": "assets/illustrations/act_04_basketball.png",
+    
+    "act5": "assets/illustrations/act_04_basketball.png",  # Reuse for science club
+    "act5_hack": "assets/illustrations/act_04_basketball.png",
+    "act5_good": "assets/illustrations/act_04_basketball.png",
+    "act5_skip": "assets/illustrations/act_04_basketball.png",
+    
+    "act6": "assets/illustrations/act_06_sabotage.png",
+    "act6_spy": "assets/illustrations/act_06_sabotage.png",
+    "act6_psycho": "assets/illustrations/act_06_sabotage.png",
+    "act6_petty": "assets/illustrations/act_06_sabotage.png",
+    
+    "act7": "assets/illustrations/act_04_basketball.png",  # Exam scene
+    "act7_rival": "assets/illustrations/act_04_basketball.png",
+    "act7_expose": "assets/illustrations/act_04_basketball.png",
+    "act7_ignore": "assets/illustrations/act_04_basketball.png",
+    
+    "act8": "assets/illustrations/act_04_basketball.png",  # Futsal scene
+    "act8_chaos": "assets/illustrations/act_04_basketball.png",
+    "act8_rich": "assets/illustrations/act_04_basketball.png",
+    "act8_lose": "assets/illustrations/act_04_basketball.png",
+    
+    "act9": "assets/illustrations/act_06_sabotage.png",  # Canteen
+    "act9_boikot": "assets/illustrations/act_06_sabotage.png",
+    "act9_demo": "assets/illustrations/act_06_sabotage.png",
+    "act9_skip": "assets/illustrations/act_06_sabotage.png",
+    
+    "act10": "assets/illustrations/act_02_invitation.png",  # Elara scene
+    "act10_ally": "assets/illustrations/act_02_invitation.png",
+    "act10_check": "assets/illustrations/act_02_invitation.png",
+    "act10_date": "assets/illustrations/act_02_invitation.png",
+    
+    # ACT 11-15: Dismantling Lieutenants
+    "act11": "assets/illustrations/act_11_sarah.png",
+    "act11_safe": "assets/illustrations/act_11_sarah.png",
+    "act11_attack": "assets/illustrations/act_11_sarah.png",
+    "act11_fail": "assets/illustrations/act_11_sarah.png",
+    
+    "act12": "assets/illustrations/act_06_sabotage.png",  # Leo scene
+    "act12_fight": "assets/illustrations/act_06_sabotage.png",
+    "act12_cruel": "assets/illustrations/act_06_sabotage.png",
+    "act12_bribe": "assets/illustrations/act_06_sabotage.png",
+    
+    "act13": "assets/illustrations/act_13_principals_office.png",
+    "act13_stealth": "assets/illustrations/act_13_principals_office.png",
+    "act13_bribe": "assets/illustrations/act_13_principals_office.png",
+    "act13_skip": "assets/illustrations/act_13_principals_office.png",
+    
+    "act14": "assets/illustrations/act_02_invitation.png",  # Pensi - use party image
+    "act14_video": "assets/illustrations/act_02_invitation.png",
+    "act14_sound": "assets/illustrations/act_02_invitation.png",
+    "act14_boring": "assets/illustrations/act_02_invitation.png",
+    
+    "act15": "assets/illustrations/act_11_sarah.png",  # Budget leak
+    "act15_hero": "assets/illustrations/act_11_sarah.png",
+    "act15_coward": "assets/illustrations/act_11_sarah.png",
+    
+    # ACT 16-20: Escalation
+    "act16": "assets/illustrations/act_06_sabotage.png",  # War scene
+    "act16_war": "assets/illustrations/act_06_sabotage.png",
+    "act16_diplo": "assets/illustrations/act_06_sabotage.png",
+    "act16_hide": "assets/illustrations/act_06_sabotage.png",
+    
+    "act17": "assets/illustrations/act_13_principals_office.png",  # Propaganda
+    "act17_press": "assets/illustrations/act_13_principals_office.png",
+    "act17_hack": "assets/illustrations/act_13_principals_office.png",
+    "act17_fail": "assets/illustrations/act_13_principals_office.png",
+    
+    "act18": "assets/illustrations/act_11_sarah.png",  # Teacher strike
+    "act18_lead": "assets/illustrations/act_11_sarah.png",
+    "act18_traitor": "assets/illustrations/act_11_sarah.png",
+    "act18_kind": "assets/illustrations/act_11_sarah.png",
+    
+    "act19": "assets/illustrations/act_06_sabotage.png",  # Frame up
+    "act19_reverse": "assets/illustrations/act_06_sabotage.png",
+    "act19_flush": "assets/illustrations/act_06_sabotage.png",
+    "act19_crazy": "assets/illustrations/act_06_sabotage.png",
+    
+    "act20": "assets/illustrations/act_01_arrival.png",  # Suspension
+    
+    # ACT 21-25: Endgame
+    "act21": "assets/illustrations/act_01_arrival.png",  # Return of King
+    "act21_march": "assets/illustrations/act_01_arrival.png",
+    "act21_car": "assets/illustrations/act_01_arrival.png",
+    "act21_police": "assets/illustrations/act_01_arrival.png",
+    
+    "act22": "assets/illustrations/act_13_principals_office.png",  # Debate prep
+    "act23_nuke": "assets/illustrations/act_02_invitation.png",  # Grand debate
+    "act23_logic": "assets/illustrations/act_02_invitation.png",
+    
+    "act24": "assets/illustrations/act_11_sarah.png",  # Voting day
+    "act25_result": "assets/illustrations/act_11_sarah.png",
+    "ending_calc": "assets/illustrations/act_11_sarah.png",
+    
+    # Endings
+    "end_victory": "assets/illustrations/act_01_arrival.png",
+    "end_close": "assets/illustrations/act_01_arrival.png",
+    "end_lose": "assets/illustrations/act_01_arrival.png",
+}
+
+def display_illustration(scene_id):
+    """Display illustration for current scene with gothic border"""
+    if scene_id in ILLUSTRATIONS:
+        img_path = ILLUSTRATIONS[scene_id]
+        if os.path.exists(img_path):
+            # Display with custom styling
+            st.markdown("""
+                <style>
+                .illustration-frame {
+                    border: 3px solid #660000;
+                    border-radius: 5px;
+                    box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+                    margin: 10px 0;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            st.image(img_path, use_container_width=True)
+
 GAME_SCENES = {
     # --- ACT 1-3: INTRODUCTION ---
     "start": {
@@ -408,6 +549,10 @@ with chat_container:
 curr_id = st.session_state.current_scene
 scene = GAME_SCENES.get(curr_id)
 
+# Display illustration for current scene
+if curr_id:
+    display_illustration(curr_id)
+
 if scene:
     # Handler Ending Calculation
     if scene.get("special") == "calc_ending":
@@ -488,8 +633,16 @@ if scene:
     
     # Linear continuation (No choices, just text/next)
     elif "next" in scene:
-         if st.button("Lanjutkan Teror..."):
-            st.session_state.current_scene = scene["next"]
-            new_s = GAME_SCENES[scene["next"]]
-            st.session_state.messages.append({"role": "assistant", "content": new_s["text"]})
-            st.rerun()
+         target = scene["next"]
+         # Ubah teks tombol jika targetnya adalah restart
+         btn_text = "🔄 Main Lagi (Restart)" if target == "restart" else "Lanjutkan Teror..."
+         
+         if st.button(btn_text):
+            if target == "restart":
+                reset_game()
+            else:
+                st.session_state.current_scene = target
+                new_s = GAME_SCENES.get(target)
+                if new_s:
+                    st.session_state.messages.append({"role": "assistant", "content": new_s["text"]})
+                st.rerun()
